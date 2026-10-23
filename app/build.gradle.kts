@@ -8,10 +8,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.roamly"
+    namespace = "com.roamly.app"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.example.roamly"
+        applicationId = "com.roamly.app"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

@@ -1,0 +1,482 @@
+package com.roamly.app.navigation
+
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.roamly.app.entity.ViewModel.OrderCreationViewModel
+import com.roamly.app.entity.ViewModel.OrderViewModel
+import com.roamly.app.ui.screens.AdminPanelScreen
+import com.roamly.app.ui.screens.HomeScreen
+import com.roamly.app.ui.screens.SearchScreen
+import com.roamly.app.ui.screens.profileFR.SingUpScreen
+import com.roamly.app.ui.screens.profileFR.LoginScreen
+import com.roamly.app.ui.screens.sealed.SealedButtonBar
+import com.roamly.app.ui.screens.sealed.ProfileScreens
+import com.roamly.app.entity.ViewModel.UserViewModel
+import com.roamly.app.ui.screens.BookingDetailScreen
+import com.roamly.app.ui.screens.UserBookingsScreen
+import com.roamly.app.ui.screens.admin.AdminReportsScreen
+import com.roamly.app.ui.screens.admin.NotificationsScreen
+import com.roamly.app.ui.screens.admin.PendingListScreen
+import com.roamly.app.ui.screens.admin.SqlDetailScreen
+import com.roamly.app.ui.screens.admin.SqlListScreen
+import com.roamly.app.ui.screens.booking.CreateBookingScreen
+import com.roamly.app.ui.screens.booking.ApproveBookingsScreen
+import com.roamly.app.ui.screens.booking.OwnerApprovedBookingsScreen
+import com.roamly.app.ui.screens.booking.OwnerBookingsManagementScreen
+import com.roamly.app.ui.screens.establishment.CreateEstablishmentScreen
+import com.roamly.app.ui.screens.establishment.EstablishmentDetailScreen
+import com.roamly.app.ui.screens.establishment.EstablishmentEditScreen
+import com.roamly.app.ui.screens.establishment.MapPickerScreen
+import com.roamly.app.ui.screens.establishment.MenuEditScreen
+import com.roamly.app.ui.screens.establishment.ReviewCreationScreen
+import com.roamly.app.ui.screens.establishment.UserEstablishmentsScreen
+import com.roamly.app.ui.screens.order.CreateDeliveryAddressScreen
+import com.roamly.app.ui.screens.order.DeliveryAddressScreen
+import com.roamly.app.ui.screens.order.EditDeliveryAddressScreen
+import com.roamly.app.ui.screens.order.OrderCheckoutScreen
+import com.roamly.app.ui.screens.order.OrderCreationMenuScreen
+import com.roamly.app.ui.screens.order.OrderDetailsScreen
+import com.roamly.app.ui.screens.order.OrderListScreen
+import com.roamly.app.ui.screens.order.OwnerOrdersManagementScreen
+import com.roamly.app.ui.screens.profileFR.EditProfileScreen
+import com.roamly.app.ui.screens.profileFR.NotificationsScreen
+import com.roamly.app.ui.screens.profileFR.ProfileScreen
+import com.roamly.app.ui.screens.sealed.*
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun NavGraph(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+    userViewModel: UserViewModel,
+    orderViewModel: OrderViewModel,
+    mapRefreshKey: Boolean,
+    orderCreationViewModel: OrderCreationViewModel,
+    onMapRefresh: () -> Unit,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = SealedButtonBar.Home.route,
+        modifier = modifier
+    ) {
+        // --- Основные вкладки ---
+        composable(SealedButtonBar.Home.route) {
+            HomeScreen(navController, mapRefreshKey, onMapRefresh)
+        }
+        composable(SealedButtonBar.Searching.route) {
+            SearchScreen(navController)
+        }
+
+        composable(SealedButtonBar.Booking.route) {
+            UserBookingsScreen(navController = navController, userViewModel = userViewModel)
+        }
+
+        composable(SealedButtonBar.Profile.route) {
+            ProfileScreen(navController, userViewModel, orderViewModel)
+        }
+
+        // --- Экраны авторизации ---
+        composable(ProfileScreens.SingUp.route) {
+            SingUpScreen(navController, userViewModel)
+        }
+        composable(ProfileScreens.Login.route) {
+            LoginScreen(navController, userViewModel)
+        }
+
+        // --- Админ панель ---
+        composable(SealedButtonBar.AdminPanel.route) {
+            AdminPanelScreen(navController)
+        }
+
+        // --- Создание заведения ---
+        composable(EstablishmentScreens.CreateEstablishment.route) {
+            CreateEstablishmentScreen(navController, userViewModel)
+        }
+        composable(EstablishmentScreens.MapPicker.route) {
+            MapPickerScreen(navController)
+        }
+        composable(EstablishmentScreens.UserEstablishments.route) {
+            UserEstablishmentsScreen(navController, userViewModel)
+        }
+
+        composable(route = NotificationScreens.Notifications.route) {
+            NotificationsScreen(navController = navController)
+        }
+
+        // NavGraph.kt (добавьте composable для EditProfile в NavHost)
+
+        composable(ProfileScreens.EditProfile.route) {
+            EditProfileScreen(
+                navController = navController,
+                userViewModel = userViewModel
+            )
+        }
+
+        // Просмотр и редактирование заведения
+        composable(
+            route = EstablishmentScreens.EstablishmentDetail.route,
+            arguments = listOf(
+                navArgument(EstablishmentScreens.EstablishmentDetail.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(
+                EstablishmentScreens.EstablishmentDetail.ESTABLISHMENT_ID_KEY
+            ) ?: return@composable
+            EstablishmentDetailScreen(
+                navController = navController,
+                establishmentId = establishmentId
+            )
+        }
+
+        composable(
+            route = EstablishmentScreens.EstablishmentEdit.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getLong("id") ?: return@composable
+            EstablishmentEditScreen(navController, id)
+        }
+
+        composable(
+            route = EstablishmentScreens.MenuEdit.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getLong("id") ?: return@composable
+            MenuEditScreen(navController, establishmentId = id)
+        }
+
+        composable(
+            route = EstablishmentScreens.ReviewCreation.route,
+            arguments = listOf(
+                navArgument(EstablishmentScreens.ReviewCreation.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(EstablishmentScreens.ReviewCreation.ESTABLISHMENT_ID_KEY)
+
+            if (establishmentId != null) {
+                ReviewCreationScreen(
+                    navController = navController,
+                    establishmentId = establishmentId
+                )
+            } else {
+                navController.popBackStack()
+            }
+        }
+
+        // Админские фишки
+        composable(AdminScreens.PendingList.route) {
+            PendingListScreen()
+        }
+
+        // =====================================
+        // Создание и просмотр бронирования
+        // =====================================
+        composable(
+            route = BookingScreens.CreateBooking.route,
+            arguments = listOf(
+                navArgument(BookingScreens.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(BookingScreens.ESTABLISHMENT_ID_KEY)
+
+            if (establishmentId != null) {
+                CreateBookingScreen(
+                    navController = navController,
+                    establishmentId = establishmentId
+                )
+            } else {
+                navController.popBackStack()
+            }
+        }
+
+        composable(
+            route = BookingScreens.BookingDetail.route,
+            arguments = listOf(
+                navArgument(BookingScreens.BOOKING_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val bookingId = backStackEntry.arguments?.getLong(BookingScreens.BOOKING_ID_KEY)
+
+            if (bookingId != null) {
+                BookingDetailScreen(
+                    navController = navController,
+                    bookingId = bookingId
+                )
+            } else {
+                navController.popBackStack()
+            }
+        }
+
+        composable(EstablishmentScreens.ApproveBookings.route) {
+            ApproveBookingsScreen(navController = navController, userViewModel = userViewModel)
+        }
+
+        composable(
+            route = BookingScreens.OwnerBookingsManagement.route,
+            arguments = listOf(navArgument(BookingScreens.ESTABLISHMENT_ID_KEY) { type = NavType.StringType })
+        ) { backStackEntry ->
+            val establishmentIdStr = backStackEntry.arguments?.getString(BookingScreens.ESTABLISHMENT_ID_KEY)
+            val establishmentId = establishmentIdStr?.toLongOrNull() ?: 0L
+
+            if (establishmentId == 0L) {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Ошибка: неверный ID заведения")
+                }
+            } else {
+                OwnerBookingsManagementScreen(navController = navController, establishmentId = establishmentId)
+            }
+        }
+
+        composable(
+            route = BookingScreens.OwnerApprovedBookings.route,
+            arguments = listOf(navArgument(BookingScreens.ESTABLISHMENT_ID_KEY) { type = NavType.StringType })
+        ) { backStackEntry ->
+            val establishmentIdStr = backStackEntry.arguments?.getString(BookingScreens.ESTABLISHMENT_ID_KEY)
+            val establishmentId = establishmentIdStr?.toLongOrNull() ?: 0L
+
+            if (establishmentId == 0L) {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Ошибка: неверный ID заведения")
+                }
+            } else {
+                OwnerApprovedBookingsScreen(navController = navController, establishmentId = establishmentId)
+            }
+        }
+
+        // =====================================
+        // Создание заказа - ИСПОЛЬЗУЕМ SEALED CLASSES
+        // =====================================
+        composable(
+            route = OrderScreens.OrderCreation.route,
+            arguments = listOf(
+                navArgument(OrderScreens.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(OrderScreens.ESTABLISHMENT_ID_KEY) ?: return@composable
+            OrderCreationMenuScreen(
+                navController = navController,
+                establishmentId = establishmentId,
+                viewModel = orderCreationViewModel
+            )
+        }
+
+        // =====================================
+        // Оформление заказа
+        // =====================================
+        composable(
+            route = OrderScreens.OrderCheckout.route,
+            arguments = listOf(
+                navArgument(OrderScreens.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(OrderScreens.ESTABLISHMENT_ID_KEY) ?: return@composable
+            val userId = userViewModel.getId()
+
+            if (userId != null) {
+                OrderCheckoutScreen(
+                    navController = navController,
+                    establishmentId = establishmentId,
+                    userId = userId,
+                    orderViewModel = orderViewModel,
+                    orderCreationViewModel = orderCreationViewModel
+                )
+            }
+        }
+
+        // =====================================
+        // Список заказов
+        // =====================================
+        composable(OrderScreens.OrderList.route) {
+            OrderListScreen(navController, userViewModel)
+        }
+
+        // Детали заказа
+        composable(
+            route = OrderScreens.OrderDetails.route,
+            arguments = listOf(
+                navArgument(OrderScreens.ORDER_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong(OrderScreens.ORDER_ID_KEY)
+            orderId?.let {
+                OrderDetailsScreen(
+                    navController = navController,
+                    orderId = orderId
+                )
+            }
+        }
+
+        composable(
+            route = OrderScreens.OwnerOrdersManagement.route,
+            arguments = listOf(
+                navArgument(OrderScreens.ESTABLISHMENT_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong(
+                OrderScreens.ESTABLISHMENT_ID_KEY
+            ) ?: return@composable
+
+            OwnerOrdersManagementScreen(
+                navController = navController,
+                establishmentId = establishmentId
+            )
+        }
+
+        // =====================================
+        // Адреса доставки
+        // =====================================
+        composable(
+            route = OrderScreens.DeliveryAddresses.route,
+            arguments = listOf(
+                navArgument(OrderScreens.USER_ID_KEY) { type = NavType.LongType },
+                navArgument("isSelectionMode") {
+                    type = NavType.BoolType
+                    defaultValue = true
+                }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getLong(OrderScreens.USER_ID_KEY) ?: return@composable
+            val isSelectionMode = backStackEntry.arguments?.getBoolean("isSelectionMode") ?: true
+
+            DeliveryAddressScreen(
+                navController = navController,
+                userId = userId,
+                isSelectionMode = isSelectionMode,
+                onAddressSelected = { address ->
+                    // Устанавливаем результат и выходим (ОДИН РАЗ)
+                    navController.previousBackStackEntry?.savedStateHandle?.set("selectedAddress", address)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = OrderScreens.CreateDeliveryAddress.route,
+            arguments = listOf(
+                navArgument(OrderScreens.USER_ID_KEY) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getLong(OrderScreens.USER_ID_KEY) ?: return@composable
+            CreateDeliveryAddressScreen(navController, userId)
+        }
+
+        composable(
+            route = OrderScreens.EditDeliveryAddress.route,
+            arguments = listOf(
+                navArgument(OrderScreens.USER_ID_KEY) { type = NavType.LongType },
+                navArgument(OrderScreens.ADDRESS_ID_KEY) { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getLong(OrderScreens.USER_ID_KEY) ?: return@composable
+            val addressId = backStackEntry.arguments?.getLong(OrderScreens.ADDRESS_ID_KEY) ?: return@composable
+            EditDeliveryAddressScreen(navController, userId, addressId)
+        }
+
+        composable(AdminScreens.SqlList.route) {
+            SqlListScreen(navController)
+        }
+
+        // Внутри NavHost
+        composable(
+            route = AdminScreens.SqlDetail.route,
+            arguments = listOf(
+                navArgument("queryId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            // Получаем ID из аргументов
+            val queryId = backStackEntry.arguments?.getLong("queryId") ?: 0L
+
+            // Передаем в экран
+            SqlDetailScreen(
+                navController = navController,
+                queryId = queryId
+            )
+        }
+
+        composable(AdminScreens.PendingList.route) {
+            PendingListScreen()
+        }
+
+        composable(AdminScreens.Notifications.route) {
+            NotificationsScreen()
+        }
+
+        composable(AdminScreens.Reports.route) {
+            AdminReportsScreen(navController)
+        }
+
+
+        // 1. Существующий маршрут создания (оставляем как есть, аргументы по дефолту null/empty)
+        composable(
+            route = EstablishmentScreens.ReviewCreation.route,
+            arguments = listOf(navArgument("establishmentId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong("establishmentId") ?: 0L
+            ReviewCreationScreen(
+                navController = navController,
+                establishmentId = establishmentId
+                // reviewId, initialRating, initialComment остаются дефолтными
+            )
+        }
+
+        composable(
+            route = EstablishmentScreens.ReviewEditing.route,
+            arguments = listOf(
+                navArgument("establishmentId") { type = NavType.LongType },
+                navArgument("reviewId") { type = NavType.LongType },
+                navArgument("rating") { type = NavType.FloatType },
+                navArgument("comment") { type = NavType.StringType } // Изменено с "text" на "comment" и удален "photo"
+            )
+        ) { backStackEntry ->
+            val establishmentId = backStackEntry.arguments?.getLong("establishmentId") ?: 0L
+            val reviewId = backStackEntry.arguments?.getLong("reviewId") ?: 0L
+            val rating = backStackEntry.arguments?.getFloat("rating") ?: 0f
+            val encodedComment = backStackEntry.arguments?.getString("comment") ?: ""
+            val comment = android.net.Uri.decode(encodedComment) // Декодируем, так как в createRoute кодировали
+
+            ReviewCreationScreen(
+                navController = navController,
+                establishmentId = establishmentId,
+                reviewId = reviewId,           // Передаем ID для режима редактирования
+                initialRating = rating,        // Начальный рейтинг
+                initialText = comment          // Начальный текст (декодированный)
+            )
+        }
+
+    }
+}

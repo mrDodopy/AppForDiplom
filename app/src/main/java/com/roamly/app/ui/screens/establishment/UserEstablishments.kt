@@ -1,0 +1,379 @@
+// UserEstablishments.kt
+package com.roamly.app.ui.screens.establishment
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.roamly.app.R
+import com.roamly.app.entity.DTO.establishment.EstablishmentWithCountsDto
+import com.roamly.app.entity.ViewModel.EstablishmentViewModel
+import com.roamly.app.entity.ViewModel.UserEstablishmentsViewModel
+import com.roamly.app.entity.ViewModel.UserViewModel
+import com.roamly.app.entity.classes.TypeOfEstablishment
+import com.roamly.app.entity.classes.convertTypeToWord
+import com.roamly.app.ui.screens.sealed.BookingScreens
+import com.roamly.app.ui.screens.sealed.EstablishmentScreens
+import com.roamly.app.ui.screens.sealed.OrderScreens
+import com.roamly.app.ui.theme.AppTheme
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UserEstablishmentsScreen(
+    navController: NavController,
+    userViewModel: UserViewModel = hiltViewModel(),
+    establishmentViewModel: EstablishmentViewModel = hiltViewModel(),
+    pinnedViewModel: UserEstablishmentsViewModel = hiltViewModel()
+) {
+    val user by userViewModel.user.collectAsState()
+    // Используем establishments с количеством
+    val establishmentsWithCounts by establishmentViewModel.userEstablishmentsWithCounts.collectAsState(emptyList())
+    val pinnedIds by pinnedViewModel.pinnedEstablishments.collectAsState()
+    val isLoading by establishmentViewModel.countsLoading.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Поиск и фильтрация на клиенте
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf<TypeOfEstablishment?>(null) }
+
+    val establishmentTypes = TypeOfEstablishment.values().filter { it != TypeOfEstablishment.Error }
+
+    // Фильтрация заведений
+    val filteredEstablishments = establishmentsWithCounts.filter { est ->
+        (searchQuery.isEmpty() || est.name.contains(searchQuery, ignoreCase = true)) &&
+                (selectedType == null || est.type == selectedType)
+    }
+
+    // Разделяем на закрепленные и обычные
+    val pinnedEstablishments = filteredEstablishments.filter { it.id in pinnedIds }
+    val otherEstablishments = filteredEstablishments.filter { it.id !in pinnedIds }
+
+    // Объединенный список
+    val displayList = buildList {
+        if (pinnedEstablishments.isNotEmpty()) {
+            add("Закрепленные")
+            addAll(pinnedEstablishments)
+        }
+        if (otherEstablishments.isNotEmpty()) {
+            add("Все заведения")
+            addAll(otherEstablishments)
+        }
+    }
+
+    LaunchedEffect(user.id) {
+        user.id?.let { establishmentViewModel.fetchEstablishmentsWithCountsByUserId(it) }
+    }
+
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text("Мои заведения", color = AppTheme.colors.MainText)
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = AppTheme.colors.MainText
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = AppTheme.colors.SecondaryContainer
+                ),
+                modifier = Modifier.fillMaxHeight(0.08f)
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(AppTheme.colors.MainContainer)
+        ) {
+            // Поисковая строка
+            val focusRequester = remember { FocusRequester() }
+            val focusManager = LocalFocusManager.current
+
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .focusRequester(focusRequester),
+                placeholder = { Text("Поиск по названию...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = AppTheme.colors.SecondaryContainer,
+                    unfocusedContainerColor = AppTheme.colors.SecondaryContainer,
+                    focusedIndicatorColor = AppTheme.colors.MainSuccess,
+                    unfocusedIndicatorColor = AppTheme.colors.MainBorder,
+                    focusedTextColor = AppTheme.colors.MainText,
+                    unfocusedTextColor = AppTheme.colors.MainText,
+                    focusedPlaceholderColor = AppTheme.colors.SecondaryText,
+                    unfocusedPlaceholderColor = AppTheme.colors.SecondaryText
+                )
+            )
+
+            // Фильтры по типу
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(
+                        bottom = 8.dp,
+                        start = 16.dp,
+                        end = 16.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedType == null,
+                    onClick = { selectedType = null },
+                    label = { Text("Все") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AppTheme.colors.MainSuccess.copy(alpha = 0.2f),
+                        selectedLabelColor = AppTheme.colors.MainText
+                    )
+                )
+                establishmentTypes.forEach { type ->
+                    FilterChip(
+                        selected = selectedType == type,
+                        onClick = { selectedType = type },
+                        label = { Text(convertTypeToWord(type)) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AppTheme.colors.MainSuccess.copy(alpha = 0.2f),
+                            selectedLabelColor = AppTheme.colors.MainText
+                        )
+                    )
+                }
+            }
+
+            // Список с анимацией подгрузки
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = AppTheme.colors.MainSuccess
+                    )
+                } else if (displayList.isEmpty()) {
+                    Text(
+                        "Нет заведений",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = AppTheme.colors.SecondaryText
+                    )
+                } else {
+                    this@Column.AnimatedVisibility(
+                        visible = !isLoading,
+                        enter = fadeIn(animationSpec = tween(500)),
+                        exit = fadeOut(animationSpec = tween(500))
+                    ) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            displayList.forEach { item ->
+                                when (item) {
+                                    is String -> {
+                                        item {
+                                            Text(
+                                                text = item,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppTheme.colors.MainText,
+                                                modifier = Modifier.padding(vertical = 8.dp)
+                                            )
+                                        }
+                                    }
+
+                                    is EstablishmentWithCountsDto -> {
+                                        item {
+                                            EstablishmentItem(
+                                                establishment = item,
+                                                isPinned = item.id in pinnedIds,
+                                                onPinClick = { clickedId ->
+                                                    coroutineScope.launch {
+                                                        pinnedViewModel.togglePin(clickedId)
+                                                    }
+                                                },
+                                                onBookingsClick = { clickedId ->
+                                                    navController.navigate(
+                                                        BookingScreens.OwnerBookingsManagement.createRoute(clickedId)
+                                                    )
+                                                },
+                                                onOrdersClick = { clickedId ->
+                                                    navController.navigate(
+                                                        OrderScreens.OwnerOrdersManagement.createRoute(clickedId)
+                                                    )
+                                                },
+                                                navController = navController
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EstablishmentItem(
+    establishment: EstablishmentWithCountsDto,
+    isPinned: Boolean,
+    onPinClick: (Long) -> Unit,
+    onBookingsClick: (Long) -> Unit,
+    onOrdersClick: (Long) -> Unit,
+    navController: NavController
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                navController.navigate(
+                    EstablishmentScreens.EstablishmentDetail.createRoute(establishment.id)
+                )
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = AppTheme.colors.SecondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = establishment.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AppTheme.colors.MainText
+                )
+
+                IconButton(
+                    onClick = { onPinClick(establishment.id) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = if (isPinned) R.drawable.keep_24px else R.drawable.keep_off_24px), // Изменено
+                        contentDescription = if (isPinned) "Открепить" else "Закрепить",
+                        tint = if (isPinned) AppTheme.colors.MainSuccess else AppTheme.colors.SecondaryText
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = establishment.address,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppTheme.colors.SecondaryText
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Кнопки действий с бейджами
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Кнопка бронирований с бейджем
+                Box(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Button(
+                        onClick = { onBookingsClick(establishment.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppTheme.colors.MainSuccess
+                        )
+                    ) {
+                        Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Бронирования")
+                    }
+
+                    // Бейдж для бронирований
+                    if (establishment.pendingBookingsCount > 0) {
+                        Badge(
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = establishment.pendingBookingsCount.toString(),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+
+                // Кнопка заказов с бейджем
+                Box(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    OutlinedButton(
+                        onClick = { onOrdersClick(establishment.id) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Заказы", color = AppTheme.colors.MainText)
+                    }
+
+                    // Бейдж для заказов
+                    if (establishment.pendingOrdersCount > 0) {
+                        Badge(
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = establishment.pendingOrdersCount.toString(),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
